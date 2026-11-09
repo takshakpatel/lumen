@@ -6,9 +6,12 @@ import time
 from typing import Any
 
 from dotenv import load_dotenv
-load_dotenv(override=True)
+from pathlib import Path
+_ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=_ENV_PATH, override=True)
 
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.documents import Document
 from langchain_groq import ChatGroq
 
 from app.retriever import naive_retrieve
@@ -72,16 +75,17 @@ def _rewrite_query(query: str) -> list[str]:
         return [query]
 
 
-_SYSTEM_PROMPT = """You are a precise research assistant. You answer questions about a set of documents, using the retrieved context as your source of truth.
+_SYSTEM_PROMPT = """You are Lumen, an advanced cognitive document intelligence assistant.
+You possess holistic understanding of the uploaded documents, including their overarching purpose, structured tables, and visual charts/figures.
 
-Guidelines:
-1. Base your answer on the provided context and prior conversation history. You may synthesize and organize information across chunks.
-2. If you are asked for a summary, overview, or "what is this about", give a clear structured summary of the documents' main points.
-3. If the context and conversation history do NOT contain enough information to answer, say: "I don't have enough information in the provided documents to answer that question."
-4. Never invent facts or details not present in the context.
-5. Cite supporting sources inline using [1], [2], etc. matching the source numbers below. Cite all sources that support a claim.
-6. When a numbered list or structure improves the answer, use it.
-7. Be concise and direct.
+Core Cognitive Guidelines:
+1. Deep Holistic Comprehension: Synthesize across the document overview, section context, and specific excerpts. Explain the "what", "why", and "how" rather than merely matching literal keywords.
+2. Structured Tables & Data: When tabular data is present in the context, accurately read rows and columns to cite exact numbers, metrics, budgets, dates, and statuses.
+3. Visual Figures, Charts & Graphs: When visual figures, diagrams, or charts are retrieved, naturally integrate their transcribed data, axes, trends, and conclusions into your explanation.
+4. Holistic & Summary Inquiries: When asked high-level questions ("what is this about", "summarize", "analyze the overall implications"), synthesize a structured overview integrating the Executive Document Overview and relevant sections.
+5. Specific Inquiries: When asked specific questions, deliver direct, accurate answers grounded in the facts, while preserving context.
+6. Clean Output: Deliver clean, fluent, structured markdown without bracketed citation numbers like [1] or [2] (sources are cited separately by the application UI).
+7. Absolute Truthfulness: Never hallucinate facts outside the provided document context. If information is genuinely missing, clearly state what is known and what cannot be determined.
 
 Context:
 {context}"""
@@ -89,29 +93,72 @@ Context:
 _FOLLOWUP_PATTERNS = r"(?i)\b(it|its|they|them|their|these|those|this|that|he|she|him|her|the above|previous|and\?|what about|how about|more details|explain further)\b"
 
 
-def _format_context(docs) -> tuple[str, list[dict]]:
-    context_parts = []
+def _get_document_summaries(collection_name: str, target_filenames: set[str] | None = None):
+    """Retrieve Executive Document Overview chunks for the relevant documents."""
+    try:
+        from app.vectorstore import get_vectorstore
+        store = get_vectorstore(collection_name=collection_name)
+        res = store.get(where={"type": "document_summary"})
+        docs = []
+        if res and res.get("documents"):
+            for doc_str, meta in zip(res["documents"], res.get("metadatas", [])):
+                fn = meta.get("filename", "") if meta else ""
+                if not target_filenames or fn in target_filenames or not fn:
+                    docs.append(Document(page_content=doc_str, metadata=meta or {}))
+        return docs
+    except Exception as e:
+        print(f"Warning: could not fetch document summaries: {e}")
+        return []
+
+
+def _format_context(docs, summaries=None) -> tuple[str, list[dict]]:
+    from app.retriever import dedupe_documents
+    docs = dedupe_documents(docs)
+    context_sections = []
+
+    # 1. Inject Global Document Executive Overviews (Whole-Document Context)
+    if summaries:
+        overview_texts = [s.page_content.strip() for s in summaries if s.page_content.strip()]
+        if overview_texts:
+            context_sections.append(
+                "=== GLOBAL DOCUMENT CONTEXT & EXECUTIVE MAPS ===\n" +
+                "\n\n".join(overview_texts)
+            )
+
+    # 2. Inject Targeted Evidence (Text, Tables, Vision-Analyzed Figures)
+    evidence_parts = []
     source_map = {}
     for i, doc in enumerate(docs):
-        source = doc.metadata.get("source", "unknown")
-        label = f"[{i + 1}]"
-        if doc.metadata.get("type") == "image":
-            page = doc.metadata.get("page", "?")
-            context_parts.append(
-                f"{label} (Image — Source: {source}, Page: {page})\n"
-                f"{doc.page_content}"
+        raw_source = doc.metadata.get("source", "unknown")
+        clean_name = Path(raw_source).name if raw_source != "unknown" else "unknown"
+        doc_type = doc.metadata.get("type", "text")
+        page = doc.metadata.get("page", 1)
+
+        if doc_type == "image":
+            evidence_parts.append(
+                f"(Visual Figure — Source: {clean_name}, Page: {page})\n{doc.page_content}"
             )
         else:
-            context_parts.append(f"{label} (Source: {source})\n{doc.page_content}")
+            evidence_parts.append(
+                f"(Evidence — Source: {clean_name}, Page: {page})\n{doc.page_content}"
+            )
+
         source_map[i + 1] = {
-            "source": source,
+            "source": clean_name,
             "chunk_index": doc.metadata.get("chunk_index"),
             "snippet": doc.page_content[:200],
-            "type": doc.metadata.get("type", "text"),
-            "page": doc.metadata.get("page"),
+            "type": doc_type,
+            "page": page,
             "image_path": doc.metadata.get("image_path"),
         }
-    return "\n\n".join(context_parts), list(source_map.values())
+
+    if evidence_parts:
+        context_sections.append(
+            "=== SPECIFIC EVIDENCE (Tables, Text Excerpts & Visual Figures) ===\n" +
+            "\n\n".join(evidence_parts)
+        )
+
+    return "\n\n".join(context_sections), list(source_map.values())
 
 
 _SUMMARY_PATTERNS = r"(?i)\b(summar(?:ize|ise|y|ies)|overview|what.{0,30}about|main (?:points?|ideas?|topics?)|give me a (?:brief )?summary|tl;?dr|key (?:takeaways?|findings?|points?)|describe (?:the |this )?document|what (?:does|do) (?:this|the) (?:doc|document|paper|file)s?\b)"
@@ -137,6 +184,13 @@ def _resolve_retrieval_query(query: str, chat_history: list[dict[str, Any]] | No
         return f"{last_user_query} {query}"
 
     return query
+
+
+def _clean_citation_tags(text: str) -> str:
+    """Strip bracketed citation tags like [1][2] or [Source 1] from answer text."""
+    cleaned = re.sub(r"(\s*\[(?:(?:source\s*)?\d+|,\s*|\s*-\s*)+\])+", "", text, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+([.,;:!?])", r"\1", cleaned)
+    return cleaned.strip()
 
 
 def build_rag_answer(
@@ -166,7 +220,7 @@ def build_rag_answer(
                 query=query, prompt_tokens=0, completion_tokens=0, cached=True, latency_ms=latency
             )
             return {
-                "answer": cached.answer,
+                "answer": _clean_citation_tags(cached.answer),
                 "sources": cached.sources,
                 "query": cached.query,
                 "cached": True,
@@ -198,7 +252,12 @@ def build_rag_answer(
         docs = rerank(retrieval_query, docs, top_n=effective_k)
 
     docs = docs[:effective_k]
-    context, sources = _format_context(docs)
+
+    # Fetch Executive Document Overview chunks for whole-document context
+    target_filenames = {d.metadata.get("filename") for d in docs if d.metadata.get("filename")}
+    summaries = _get_document_summaries(collection_name, target_filenames=target_filenames)
+
+    context, sources = _format_context(docs, summaries=summaries)
 
     llm_model = os.getenv("LLM_MODEL", "qwen/qwen3.8-27b")
     llm = _get_llm()
@@ -216,7 +275,8 @@ def build_rag_answer(
     prompt = ChatPromptTemplate.from_messages(messages)
     chain = prompt | llm
 
-    answer_text = _generate_with_retry(chain, {"context": context, "question": query})
+    raw_answer = _generate_with_retry(chain, {"context": context, "question": query})
+    answer_text = _clean_citation_tags(raw_answer)
 
     history_text = " ".join([m.get("content", "") for m in (chat_history or [])[-6:]])
     prompt_tokens = token_tracker.count_tokens(_SYSTEM_PROMPT + context + history_text + query)

@@ -80,7 +80,7 @@ def rerank(
     documents: list[Document],
     top_n: int = 5,
 ) -> list[Document]:
-    """Re-rank documents using a cross-encoder model."""
+    """Re-rank documents using a cross-encoder model and filter out irrelevant noise."""
     if not documents:
         return []
 
@@ -90,4 +90,12 @@ def rerank(
 
     scored_docs = list(zip(documents, scores))
     scored_docs.sort(key=lambda x: x[1], reverse=True)
-    return [doc for doc, _ in scored_docs[:top_n]]
+
+    top_score = float(scored_docs[0][1])
+    # Filter out documents with very poor relevance compared to top score
+    # (e.g. top score -7.8 vs distant noise like research paper at -11.35)
+    filtered = [doc for doc, score in scored_docs if float(score) >= max(top_score - 3.5, -9.5)]
+    if not filtered:
+        filtered = [scored_docs[0][0]]
+
+    return dedupe_documents(filtered[:top_n])

@@ -9,12 +9,22 @@ def chunk_documents(
     chunk_size: int = 1000,
     chunk_overlap: int = 200,
 ) -> list[Document]:
-    """Split documents into overlapping chunks using recursive character splitting.
+    """Split documents into context-enriched overlapping chunks.
 
-    Image documents (metadata.type == "image") are passed through as-is.
+    Special chunk types:
+    - Image chunks (`type == "image"`) are preserved as atomic visual units.
+    - Summary chunks (`type == "document_summary"`) are preserved intact.
+    - Text chunks receive contextual breadcrumbs (`[Document: ... | Page: ...]`)
+      to eliminate orphan-chunk ambiguity and enhance BM25/Vector retrieval.
     """
-    text_docs = [d for d in documents if d.metadata.get("type") != "image"]
-    image_docs = [d for d in documents if d.metadata.get("type") == "image"]
+    text_docs = [
+        d for d in documents
+        if d.metadata.get("type") not in ("image", "document_summary")
+    ]
+    passthrough_docs = [
+        d for d in documents
+        if d.metadata.get("type") in ("image", "document_summary")
+    ]
 
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
@@ -22,13 +32,27 @@ def chunk_documents(
         length_function=len,
         add_start_index=True,
     )
-    chunks = splitter.split_documents(text_docs)
-    for i, chunk in enumerate(chunks):
+    raw_chunks = splitter.split_documents(text_docs)
+
+    enriched_chunks: list[Document] = []
+    for i, chunk in enumerate(raw_chunks):
         chunk.metadata["chunk_index"] = i
+        filename = chunk.metadata.get("filename", "Document")
+        page = chunk.metadata.get("page", 1)
+        has_tables = chunk.metadata.get("has_tables", False)
 
-    # Append image docs (unsplit) after text chunks
-    for img_doc in image_docs:
-        img_doc.metadata["chunk_index"] = len(chunks)
-        chunks.append(img_doc)
+        tag = "Structured Table" if has_tables else "Text"
+        context_header = f"[Document: {filename} | Page: {page} | {tag}]\n"
+        
+        # Prepend contextual coordinate if not already present
+        if not chunk.page_content.startswith("[Document:"):
+            chunk.page_content = f"{context_header}{chunk.page_content}"
 
-    return chunks
+        enriched_chunks.append(chunk)
+
+    # Append image and summary chunks intact
+    for doc in passthrough_docs:
+        doc.metadata["chunk_index"] = len(enriched_chunks)
+        enriched_chunks.append(doc)
+
+    return enriched_chunks

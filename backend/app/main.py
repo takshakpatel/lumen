@@ -15,6 +15,7 @@ from app.loader import load_documents, load_uploaded_files, SUPPORTED_EXTENSIONS
 from app.chunker import chunk_documents
 from app.semantic_chunker import chunk_documents_semantic
 from app.vectorstore import add_documents_to_store, reset_store, get_vectorstore
+from app.summarizer import generate_document_overview
 from app.rag import build_rag_answer
 from app.cache import query_cache
 from app.token_tracker import token_tracker
@@ -62,8 +63,25 @@ def health():
 def _ingest_docs(docs, collection_name: str, chunk_size: int, chunk_overlap: int) -> IngestResponse:
     if not docs:
         raise HTTPException(status_code=400, detail="No supported documents found in the upload.")
+
     image_count = sum(1 for d in docs if d.metadata.get("type") == "image")
-    chunks = chunk_documents(docs, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+
+    # Generate holistic Executive Document Overview maps for whole-document understanding
+    all_docs = list(docs)
+    docs_by_file: dict[str, list] = {}
+    for d in docs:
+        fn = d.metadata.get("filename", "document")
+        docs_by_file.setdefault(fn, []).append(d)
+
+    for fn, file_docs in docs_by_file.items():
+        try:
+            overview_doc = generate_document_overview(file_docs, fn)
+            if overview_doc:
+                all_docs.append(overview_doc)
+        except Exception as e:
+            print(f"Warning: Failed to generate overview for {fn}: {e}")
+
+    chunks = chunk_documents(all_docs, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     added = add_documents_to_store(chunks, collection_name=collection_name)
     return IngestResponse(
         documents_loaded=len(docs),
@@ -87,7 +105,7 @@ def ingest(req: IngestRequest):
 
 
 @app.post("/ingest/upload", response_model=IngestResponse)
-async def ingest_upload(
+def ingest_upload(
     files: list[UploadFile] = File(...),
     collection_name: str = "documents",
     chunk_size: int = 1000,
@@ -114,10 +132,15 @@ async def ingest_upload(
 
         docs = load_uploaded_files(saved)
         result = _ingest_docs(docs, collection_name, chunk_size, chunk_overlap)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
-
-    return result
 
 
 # --- Sessions & History Endpoints ---
@@ -162,46 +185,53 @@ def remove_session(session_id: str):
 
 @app.post("/query", response_model=QueryResponse)
 def query(req: QueryRequest):
-    store = get_vectorstore(collection_name=req.collection_name)
-    if store._collection.count() == 0:
-        raise HTTPException(status_code=400, detail="No documents ingested yet. Call /ingest first.")
+    try:
+        store = get_vectorstore(collection_name=req.collection_name)
+        if store._collection.count() == 0:
+            raise HTTPException(status_code=400, detail="No documents ingested yet. Please upload a document first.")
 
-    chat_history: list[dict] = []
-    if req.session_id:
-        chat_history = get_session_messages(req.session_id)
-        # Record user question
-        add_message(session_id=req.session_id, role="user", content=req.query)
+        chat_history: list[dict] = []
+        if req.session_id:
+            chat_history = get_session_messages(req.session_id)
+            # Record user question
+            add_message(session_id=req.session_id, role="user", content=req.query)
 
-    result = build_rag_answer(
-        query=req.query,
-        k=req.k,
-        collection_name=req.collection_name,
-        use_hybrid=True,
-        use_reranker=True,
-        use_cache=True,
-        chat_history=chat_history,
-    )
-
-    if req.session_id:
-        # Record assistant answer with citations and tokens
-        add_message(
-            session_id=req.session_id,
-            role="assistant",
-            content=result["answer"],
-            sources=result["sources"],
-            tokens=result["tokens"],
-            latency_ms=result["latency_ms"],
+        result = build_rag_answer(
+            query=req.query,
+            k=req.k,
+            collection_name=req.collection_name,
+            use_hybrid=True,
+            use_reranker=True,
+            use_cache=True,
+            chat_history=chat_history,
         )
 
-    return QueryResponse(
-        answer=result["answer"],
-        sources=[SourceChunk(**s) for s in result["sources"]],
-        query=result["query"],
-        session_id=req.session_id,
-        cached=result.get("cached", False),
-        tokens=result.get("tokens"),
-        latency_ms=result.get("latency_ms"),
-    )
+        if req.session_id:
+            # Record assistant answer with citations and tokens
+            add_message(
+                session_id=req.session_id,
+                role="assistant",
+                content=result["answer"],
+                sources=result["sources"],
+                tokens=result["tokens"],
+                latency_ms=result["latency_ms"],
+            )
+
+        return QueryResponse(
+            answer=result["answer"],
+            sources=[SourceChunk(**s) for s in result["sources"]],
+            query=result["query"],
+            session_id=req.session_id,
+            cached=result.get("cached", False),
+            tokens=result.get("tokens"),
+            latency_ms=result.get("latency_ms"),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Query failed: {str(e)}")
 
 
 @app.post("/query/hybrid", response_model=QueryResponse)

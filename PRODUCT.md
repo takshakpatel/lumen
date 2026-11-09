@@ -4,67 +4,50 @@
 
 ## Platform
 
-web
+Web application (Next.js 14 frontend + FastAPI Python backend).
 
 ## Stack
 
-Python, FastAPI, LangChain, Groq API (ChatGroq), local sentence-transformers (all-MiniLM-L6-v2 embeddings + ms-marco cross-encoder re-ranker), ChromaDB, BM25, SQLite, Next.js 14 (React 18, TypeScript, Tailwind CSS), Docker
+Python 3.11+, FastAPI, LangChain, Groq API (`qwen/qwen3.8-27b`), local sentence-transformers (`all-MiniLM-L6-v2` embeddings + `ms-marco` cross-encoder re-ranker), ChromaDB, BM25 (`rank-bm25`), PyMuPDF (`fitz` layout & table parser), Pillow, Matplotlib, SQLite, Next.js 14 (React 18, TypeScript, Tailwind CSS), Docker.
 
 ## Users
 
-Developers and builders who want to chat with their own documents — PDFs, DOCX, HTML, Markdown — and get cited, faithful answers rather than hallucinated ones. `[inferred from brief]`
+Researchers, engineers, analysts, and enterprise teams who need to query complex document sets (technical specifications, financial reports, research papers, charters) containing dense tables, architectural diagrams, and empirical charts, and receive grounded, cited answers with deep holistic comprehension rather than isolated snippet matching.
 
 ## Product Purpose
 
-A retrieval-augmented generation chatbot that answers questions strictly from a supplied document collection, with inline citations, a refusal mechanism when context is insufficient, and a built-in evaluation harness to measure answer quality.
+An Enterprise Cognitive RAG system that answers questions strictly from user-supplied documents with:
+1. **Multimodal Visual Understanding**: Automatically transcribing and interpreting charts, graphs, and diagrams.
+2. **Layout-Aware Structured Table Extraction**: Preserving complex tables in Markdown format.
+3. **Whole-Document Executive Maps**: Synthesizing overall document purpose, governance, metrics, and outlines to answer holistic and comparative questions without losing the big picture.
+4. **Context-Enriched Chunks (Contextual Retrieval)**: Preserving provenance and document context across every chunk.
+5. **Grounded, Clutter-Free Delivery**: Clean answers without distracting bracketed inline citation tags (`[1]`), accompanied by interactive, expandable source evidence cards.
 
 ## Positioning
 
-Unlike a generic LLM chatbot, this system ties every answer to a specific source chunk, refuses to guess when context is absent, and provides measurable retrieval and faithfulness metrics — making it a tool you can trust with real document sets. `[inferred from brief]`
+Unlike generic LLM wrappers or naive chunk-based RAG bots:
+- Lumen **understands complex visual and tabular layouts** instead of treating documents like flat character streams.
+- Lumen **avoids the "Chunk Isolation" trap** by maintaining an Executive Document Map for every uploaded file.
+- Lumen **refuses to hallucinate** when context is insufficient, explicitly stating what is known vs. unknown.
+- Lumen delivers an **enterprise-grade, accessible user experience** with non-blocking confirmation dialogs, optimistic UI, and dark/light theming.
 
-## Operating Context
+## Core Capabilities
 
-- Users upload or supply a document collection (PDF, DOCX, HTML, Markdown)
-- Documents are ingested, chunked, embedded, and indexed in a vector store
-- Users ask questions via a chat UI
-- The system retrieves relevant chunks, re-ranks them, generates an answer with inline citations
-- Token and cost tracking is visible per query
-
-## Capabilities and Constraints
-
-- Ingestion pipeline supporting PDF, DOCX, HTML, and Markdown
-- Chunking with overlap; comparison of at least two chunking strategies
-- Vector store with metadata filtering (source, date, section)
-- Hybrid retrieval: keyword (BM25) + vector search
-- Cross-encoder re-ranking of retrieved candidates
-- Answers with inline citations pointing to exact source chunks
-- Refusal behaviour when context does not contain the answer
-- Evaluation harness: retrieval hit rate + answer faithfulness on a labelled question set (30 questions minimum)
-- Token and cost tracking per query
-- Caching for repeated queries
-- Containerised deployment
-- UI: Next.js
-- Embedding model: `sentence-transformers/all-MiniLM-L6-v2` (local)
-- LLM provider: Groq API via `ChatGroq` (configurable, default `llama-3.3-70b-versatile`)
-- Re-ranker: `cross-encoder/ms-marco-MiniLM-L-6-v2` (local)
-- Persistent multi-turn chat sessions stored in SQLite
-
-## Brand Commitments
-
-None established. `[inferred]`
-
-## Evidence on Hand
-
-None. All content will come from user-supplied document collections.
+- **Multimodal Vision Ingestion**: Ingests PDFs, extracts high-resolution figures, and passes them to Groq Vision to transcribe axes, data points, trends, and takeaways.
+- **Layout-Aware Table Parsing**: Uses PyMuPDF's table detection to convert complex tables into structured Markdown tables (`| Col 1 | Col 2 |`).
+- **Executive Document Map Generation**: Automatically summarizes the purpose, key metrics, and structural outline of each uploaded document.
+- **Contextual Retrieval Chunking**: Prepends `[Document: ... | Page: ... | Type: ...]` to each chunk to prevent orphan chunks.
+- **Hybrid Search (BM25 + Dense Vectors + RRF)**: Combines exact keyword matching with deep semantic similarity.
+- **Cross-Encoder Re-Ranking**: Scores top retrieval candidates with a cross-encoder model for optimal relevance.
+- **Clean Answer Rendering**: Strips raw citation brackets from text while rendering interactive source cards in the UI.
+- **In-App Confirmation Modal Dialog**: Accessible, non-blocking modal (`ConfirmModal`) with `Escape` dismissal and autofocus on cancel for destructive actions.
+- **Optimistic UI with Hydration Guards**: Ref-tracked state prevents race conditions between client-side message sending and background server hydration.
+- **Full Theme Parity**: Complete Dark and Light mode support with zero flash on reload.
 
 ## Product Principles
 
-1. **Measure, then improve.** Every change to chunking, retrieval, or ranking is validated against a fixed evaluation set with recorded metrics.
-2. **Never hallucinate.** The system refuses to answer when context is insufficient, rather than generating plausible-sounding fabrication.
-3. **Every answer is grounded.** Inline citations tie every claim to a specific source chunk.
-4. **Start naive, ship real.** Build the simplest working version first, then iterate with measured steps.
-5. **Show the cost.** Token usage and cost are tracked per query, not hidden.
-
-## Accessibility & Inclusion
-
-No specific requirements established. `[inferred]`
+1. **Grounded In Evidence**: Every statement must stem from retrieved document context, tables, or visual figures.
+2. **Never Fabricate**: When context is absent or ambiguous, acknowledge limitations rather than hallucinating plausible fiction.
+3. **Understand the Whole**: Combine global document context with specific evidence so high-level synthesis questions receive comprehensive answers.
+4. **Defensive & Accessible UX**: Prefer accessible, non-blocking dialogs and optimistic state updates over brittle native browser primitives.
+5. **Radical Transparency**: Expose latency, tokens, cost, and exact source snippets for every answer.

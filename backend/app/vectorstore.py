@@ -36,6 +36,17 @@ def add_documents_to_store(
     collection_name: str = "documents",
 ) -> int:
     """Add chunks to the vector store. Returns the number of chunks added."""
+    if not chunks:
+        return 0
+
+    # Sanitize metadata for ChromaDB (only str, int, float, bool allowed; no None)
+    for c in chunks:
+        c.metadata = {
+            k: v
+            for k, v in c.metadata.items()
+            if v is not None and isinstance(v, (str, int, float, bool))
+        }
+
     store = get_vectorstore(persist_dir, collection_name)
     store.add_documents(chunks)
     return len(chunks)

@@ -7,23 +7,21 @@ from app.vectorstore import get_vectorstore
 
 
 def dedupe_documents(docs: list[Document]) -> list[Document]:
-    """Strip duplicate chunks caused by re-ingesting the same file.
+    """Strip duplicate chunks caused by re-ingesting the same file or identical content.
 
-    Keeps the first (highest-ranked) occurrence of each logical chunk. The key
-    uses the file *name* (not the full path) so the same document uploaded into
-    different temp directories also collapses to a single entry. Without this,
-    re-uploading a PDF floods the context with identical snippets and makes
-    answers degrade or look inconsistent across phrasings.
+    Keeps the first (highest-ranked) occurrence of each logical chunk. Uses a normalized
+    content fingerprint so identical text across different temporary upload folders
+    or formats (.pdf vs .docx) collapses to a single entry.
     """
-    seen: set[tuple] = set()
+    import re
+    seen_content: set[str] = set()
     result: list[Document] = []
     for doc in docs:
-        name = (doc.metadata.get("source") or "").split("/")[-1].split("\\")[-1]
-        ci = doc.metadata.get("chunk_index")
-        key = (name, ci, doc.page_content[:120])
-        if key in seen:
+        raw = doc.page_content.strip()
+        fingerprint = re.sub(r"\s+", " ", raw)[:150].lower()
+        if not fingerprint or fingerprint in seen_content:
             continue
-        seen.add(key)
+        seen_content.add(fingerprint)
         result.append(doc)
     return result
 

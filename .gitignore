@@ -13,6 +13,13 @@ frontend/node_modules/
 # Private user documents and extracted media (do not share)
 backend/documents/
 backend/extracted_images/
+extracted_images/
+documents/
+*.db
+
+# Local agent caches
+.agent/
+.opencode/
 
 # Build caches
 *.tsbuildinfo

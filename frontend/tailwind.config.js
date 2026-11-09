@@ -4,6 +4,19 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        ground: "var(--bg-ground)",
+        panel: "var(--panel-bg)",
+        "panel-subtle": "var(--panel-subtle)",
+        hairline: "var(--border-hairline)",
+        subtle: "var(--border-subtle)",
+        heading: "var(--text-heading)",
+        "input-box": "var(--input-bg)",
+        "input-line": "var(--input-border)",
+        "card-surface": "var(--card-bg)",
+        "item-hover": "var(--item-hover)",
+        "item-active": "var(--item-active)",
+        "btn-subtle": "var(--btn-subtle-bg)",
+        "btn-subtle-hover": "var(--btn-subtle-hover)",
         abyss: {
           0: "rgb(var(--abyss-0-rgb) / <alpha-value>)",
           1: "rgb(var(--abyss-1-rgb) / <alpha-value>)",
@@ -29,7 +42,15 @@ module.exports = {
         tick: "rgb(var(--ruler-tick-rgb) / <alpha-value>)",
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
+        sans: [
+          '"Plus Jakarta Sans"',
+          '"Geist"',
+          '"Inter"',
+          "system-ui",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "sans-serif",
+        ],
         digits: ["IBM Plex Mono", "monospace"],
       },
       boxShadow: {

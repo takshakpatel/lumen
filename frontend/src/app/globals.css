@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap');
 
 /* Token: full color (for raw CSS use) + RGB triplet (for Tailwind opacity math). */
 :root {
@@ -111,10 +111,18 @@ body {
   margin: 0;
   background: var(--bg-base);
   color: var(--ink);
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-family: "Plus Jakarta Sans", "Geist", "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  -moz-osx-font-smoothing: grayscale;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow: hidden;
+}
+
+input,
+textarea,
+button,
+select {
+  font-family: inherit;
 }
 
 /* ---- Themed browser surfaces: the parts we did not draw ---- */
@@ -251,6 +259,58 @@ textarea {
   opacity: 1;
 }
 
+/* ---- Product masthead: display type with physical depth, not image text. ---- */
+
+.lumen-masthead {
+  min-width: 0;
+}
+
+.lumen-wordmark {
+  margin: 0;
+  color: #f4fbff;
+  font-family: "Space Grotesk", "Plus Jakarta Sans", "Geist", system-ui, sans-serif;
+  font-size: clamp(2.25rem, 4vw, 3.75rem);
+  font-weight: 700;
+  letter-spacing: -0.075em;
+  line-height: 0.88;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.35),
+    0 2px 0 rgba(130, 213, 247, 0.32),
+    0 3px 0 rgba(88, 156, 204, 0.3),
+    0 4px 0 rgba(52, 106, 158, 0.25),
+    0 14px 24px rgba(0, 0, 0, 0.45),
+    0 0 24px rgba(76, 201, 240, 0.28);
+}
+
+.lumen-tagline {
+  margin: 0.55rem 0 0;
+  color: var(--ink-dim);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.theme-light .lumen-wordmark {
+  color: #18334a;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.8),
+    0 2px 0 rgba(128, 201, 231, 0.45),
+    0 3px 0 rgba(78, 153, 196, 0.32),
+    0 12px 20px rgba(42, 78, 112, 0.2);
+}
+
+@media (max-width: 640px) {
+  .lumen-wordmark {
+    font-size: 2.1rem;
+  }
+
+  .lumen-tagline {
+    display: none;
+  }
+}
+
 /* ---- Motion: arrival, feedback, and the authored entrance ---- */
 
 /* Equip an element to move (GPU-friendly; transform + opacity only). */
@@ -356,65 +416,148 @@ textarea {
   display: inline-block;
   animation: digit-snap 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-/* Aurora field: rich, moving color behind the glass so the blur reads. */
+/* Adaptive Depth Canvas: Jet Black in Dark Mode, Crisp Porcelain in Light Mode */
 .depth-canvas {
-  background:
-    radial-gradient(60% 55% at 12% 8%, rgba(var(--orb-violet-rgb), 0.3), transparent 70%),
-    radial-gradient(55% 50% at 88% 12%, rgba(var(--orb-cyan-rgb), 0.26), transparent 70%),
-    radial-gradient(65% 60% at 78% 88%, rgba(var(--orb-pink-rgb), 0.26), transparent 70%),
-    radial-gradient(50% 50% at 18% 78%, rgba(var(--orb-indigo-rgb), 0.26), transparent 72%),
-    var(--bg-base);
+  background-color: var(--bg-ground);
+  background-image:
+    radial-gradient(45% 35% at 15% 0%, rgba(var(--orb-violet-rgb), 0.08), transparent 70%),
+    radial-gradient(40% 30% at 85% 10%, rgba(var(--orb-cyan-rgb), 0.06), transparent 70%);
+  background-attachment: fixed;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Slow drift so the glass surface has life without demanding attention. */
-@keyframes aurora-drift {
-  0% {
-    background-position: 0% 0%;
-  }
-  50% {
-    background-position: 12% 6%;
-  }
-  100% {
-    background-position: 0% 0%;
-  }
-}
-.depth-canvas {
-  background-size: 120% 120%;
-  animation: aurora-drift 32s ease-in-out infinite;
+.theme-light .depth-canvas {
+  background-color: var(--bg-ground);
+  background-image:
+    radial-gradient(45% 35% at 15% 0%, rgba(139, 124, 246, 0.05), transparent 70%),
+    radial-gradient(40% 30% at 85% 10%, rgba(76, 201, 240, 0.04), transparent 70%);
 }
 
 :root {
+  --bg-ground: #000000;
   --bg-base: #000000;
-  --orb-violet-rgb: 120 92 224;
-  --orb-cyan-rgb: 40 172 232;
+  --panel-bg: rgba(10, 10, 14, 0.75);
+  --panel-subtle: rgba(255, 255, 255, 0.035);
+  --border-hairline: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.14);
+  --text-heading: #ffffff;
+  --input-bg: rgba(255, 255, 255, 0.035);
+  --input-border: rgba(255, 255, 255, 0.12);
+  --card-bg: rgba(14, 14, 18, 0.75);
+  --item-hover: rgba(255, 255, 255, 0.05);
+  --item-active: rgba(255, 255, 255, 0.09);
+  --btn-subtle-bg: rgba(255, 255, 255, 0.04);
+  --btn-subtle-hover: rgba(255, 255, 255, 0.08);
+
+  --orb-violet-rgb: 139 124 246;
+  --orb-cyan-rgb: 76 201 240;
   --orb-pink-rgb: 236 108 168;
   --orb-indigo-rgb: 90 80 200;
-  --glass-bg: rgba(255, 255, 255, 0.06);
-  --glass-bg-strong: rgba(255, 255, 255, 0.1);
-  --glass-field-bg: rgba(255, 255, 255, 0.035);
-  --glass-field-line: rgba(255, 255, 255, 0.14);
-  --glass-line: rgba(255, 255, 255, 0.12);
-  --glass-gloss: rgba(255, 255, 255, 0.16);
-  --glass-shadow: rgba(0, 0, 0, 0.7);
-  --user-solid: #6a63e8;
-  --user-solid-border: rgba(255, 255, 255, 0.14);
+  --glass-bg: rgba(14, 14, 18, 0.7);
+  --glass-bg-strong: rgba(22, 22, 28, 0.85);
+  --glass-field-bg: rgba(12, 12, 16, 0.65);
+  --glass-field-line: rgba(255, 255, 255, 0.1);
+  --glass-line: rgba(255, 255, 255, 0.08);
+  --glass-gloss: rgba(255, 255, 255, 0.06);
+  --glass-shadow: rgba(0, 0, 0, 0.8);
+  --user-solid: #6366f1;
+  --user-solid-border: rgba(255, 255, 255, 0.15);
+  --ink-3: var(--ink-dim);
+  --tooltip-bg: rgba(14, 14, 18, 0.9);
+  --tooltip-muted: var(--ink-dim);
 }
 
 .theme-light {
-  --bg-base: #eef1fb;
+  --bg-ground: #f8fafc;
+  --bg-base: #f8fafc;
+  --panel-bg: rgba(255, 255, 255, 0.88);
+  --panel-subtle: rgba(0, 0, 0, 0.03);
+  --border-hairline: rgba(0, 0, 0, 0.08);
+  --border-subtle: rgba(0, 0, 0, 0.12);
+  --text-heading: #0f172a;
+  --input-bg: #ffffff;
+  --input-border: rgba(0, 0, 0, 0.12);
+  --card-bg: #ffffff;
+  --item-hover: rgba(0, 0, 0, 0.04);
+  --item-active: rgba(0, 0, 0, 0.07);
+  --btn-subtle-bg: rgba(0, 0, 0, 0.04);
+  --btn-subtle-hover: rgba(0, 0, 0, 0.08);
+
   --orb-violet-rgb: 150 118 255;
   --orb-cyan-rgb: 64 190 255;
   --orb-pink-rgb: 250 150 200;
   --orb-indigo-rgb: 140 130 255;
-  --glass-bg: rgba(255, 255, 255, 0.42);
-  --glass-bg-strong: rgba(255, 255, 255, 0.6);
-  --glass-field-bg: rgba(255, 255, 255, 0.5);
-  --glass-field-line: rgba(255, 255, 255, 0.7);
-  --glass-line: rgba(255, 255, 255, 0.65);
-  --glass-gloss: rgba(255, 255, 255, 0.9);
-  --glass-shadow: rgba(40, 50, 90, 0.22);
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-bg-strong: rgba(255, 255, 255, 0.95);
+  --glass-field-bg: #ffffff;
+  --glass-field-line: rgba(0, 0, 0, 0.12);
+  --glass-line: rgba(0, 0, 0, 0.08);
+  --glass-gloss: rgba(255, 255, 255, 0.8);
+  --glass-shadow: rgba(40, 50, 90, 0.08);
   --user-solid: #4f46c9;
   --user-solid-border: rgba(255, 255, 255, 0.35);
+  --ink-3: var(--ink-dim);
+  --tooltip-bg: rgba(255, 255, 255, 0.95);
+  --tooltip-muted: var(--ink-dim);
+  --ink: #1e293b;
+  --ink-dim: #64748b;
+  --ink-faint: #94a3b8;
+  --reply: #0f172a;
+}
+
+@keyframes shimmer-text {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes fade-up {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes pixel-on {
+  0%, 100% {
+    opacity: 0.15;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.text-ink-3 {
+  color: var(--ink-3);
 }
 
 @media (prefers-reduced-motion: reduce) {

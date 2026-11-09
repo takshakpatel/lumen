@@ -1,102 +1,101 @@
 <div align="center">
 
-#  Lumen
+# ✦ Lumen
 
-**A retrieval-augmented chatbot that answers strictly from your own documents — with hybrid retrieval, cross-encoder re-ranking, inline citations, persistent multi-turn chat, and a frosted-glass UI.**
+**An Enterprise Cognitive RAG System that understands documents holistically — with layout-aware structured table parsing, multimodal AI vision for charts and graphs, executive document topic maps, contextual retrieval, hybrid BM25 + dense vector search, cross-encoder re-ranking, and a unified modern UI.**
 
-Local **embeddings + cross-encoder re-ranking** on your machine, generation via the **Groq API** (free tier) — no heavyweight local LLM required.
+Local **embeddings + cross-encoder re-ranking** on your machine, generation & multimodal vision via the **Groq API** (`qwen/qwen3.8-27b`) — fast, high-accuracy, and no local GPU required.
 
 </div>
 
 ---
 
-## Highlights
+## ⚡ Highlights
 
-- **Grounded, cited answers** — every answer references the exact source chunks it was built from, with inline `[1]`, `[2]` citations.
-- **Refusal guardrails** — the model is instructed to refuse when the sources genuinely don't contain the answer, instead of hallucinating.
-- **Hybrid retrieval** — BM25 keyword search + dense vector search fused with **Reciprocal Rank Fusion**, then re-ranked by a local cross-encoder for precision.
-- **Query rewriting** — the LLM generates alternative phrasings of each question to fix the keyword-mismatch problem before retrieval.
-- **Multi-turn chat with memory** — conversations are persisted to SQLite; follow-up questions are resolved against the previous turn automatically.
-- **Multi-format ingestion** — PDF, DOCX, PPTX, HTML, Markdown, TXT, and images (OCR-friendly parsing via PyMuPDF/Pillow).
-- **Reliability hardening** — automatic **retry-with-backoff** for the LLM, and **duplicate-chunk dedup** so re-uploading a file never floods the context with repeat snippets.
-- **Observability** — a TTL query cache plus cumulative **token / cost tracking** exposed via `/stats`.
-- **Glassmorphism UI** — a responsive "Glass Studio" interface with **light/dark themes**, branded **Lumen**, a **session sidebar** (new / rename / delete), and a **Clear chat** action.
-- **Containerised** — one-command startup with Docker Compose.
+- **Multimodal AI Vision for Charts & Graphs** — extracts embedded charts, line plots, and architecture diagrams, passing high-resolution renders to Groq's multimodal vision model (`qwen/qwen3.8-27b`) to transcribe axes, data series, values, and trends directly into searchable semantic chunks.
+- **Layout-Aware PDF & Markdown Table Parsing** — powered by PyMuPDF's `find_tables()` engine. Tables are converted into clean, structured Markdown tables (`| Col 1 | Col 2 |`), preserving row/column relationships that traditional flat parsers destroy.
+- **Executive Document Understanding & Topic Maps** — solves the classic *"Chunk Isolation / Lost in the Middle"* problem. During ingestion, an Executive Document Map is generated to synthesize overall purpose, critical metrics, and section structure, enabling holistic questions (*"What is this document about?"*, *"Summarize the project risks and budget"*) to be answered cohesively.
+- **Context-Enriched Chunks (Contextual Retrieval)** — every chunk is prepended with contextual provenance breadcrumbs (`[Document: ... | Page: ... | Type: ...]`), eliminating orphan-chunk ambiguity and drastically boosting BM25 and vector search precision.
+- **Grounded, Cited Answers Without Clutter** — responses are clean, fluent, and direct. Inline bracketed tags like `[1][2]` are automatically stripped from text, while interactive expandable source cards and badges remain visible in the UI.
+- **Hybrid Retrieval & Cross-Encoder Re-Ranking** — BM25 keyword search + dense vector search fused with **Reciprocal Rank Fusion (RRF)**, then precision-re-ranked by a local cross-encoder (`ms-marco-MiniLM-L-6-v2`).
+- **Query Rewriting** — the LLM automatically generates alternative semantic phrasings of each query to overcome keyword mismatch before retrieval.
+- **Multi-Turn Chat with Conversational Memory** — conversations are persisted to SQLite; ambiguous follow-ups (*"what about its budget?"*) are dynamically resolved against prior turns.
+- **Custom Accessible In-App Modal Dialogs** — non-blocking, accessible confirmation modals (`ConfirmModal.tsx`) with keyboard navigation (`Escape` dismissal, safe auto-focus on Cancel) replace dated browser `window.confirm` popups.
+- **Unified Modern UI & Light/Dark Theming** — edge-to-edge dark/light theme toggle, left-anchored animated thinking state (`LoadingState.tsx`) with live elapsed timer, and responsive sidebar navigation.
+- **Observability** — query caching plus token usage and cost tracking exposed via `/stats`.
 
 ---
 
-## Tech Stack
+## 🛠️ Tech Stack
 
 | Layer | Technology |
-|-------|------------|
-| **Backend** | Python 3.11, FastAPI, Uvicorn |
+|---|---|
+| **Backend** | Python 3.11+, FastAPI, Uvicorn |
 | **Orchestration** | LangChain (`langchain`, `langchain-groq`, `langchain-chroma`, `langchain-text-splitters`) |
-| **LLM** | Groq API via `ChatGroq` (default `llama-3.3-70b-versatile`, fully configurable) |
+| **LLM & Vision** | Groq API via `ChatGroq` (`qwen/qwen3.8-27b` for text synthesis and multimodal vision) |
 | **Embeddings** | `sentence-transformers/all-MiniLM-L6-v2` (local) |
 | **Re-ranker** | `cross-encoder/ms-marco-MiniLM-L-6-v2` (local) |
-| **Vector store** | ChromaDB (persistent, `langchain-chroma`) |
-| **Keyword search** | BM25 (`rank-bm25` via `BM25Retriever`) |
-| **History store** | SQLite (`lumen_history.db`) |
-| **Tokenisation** | `tiktoken` |
-| **Document parsing** | PyMuPDF, pypdf, python-docx, python-pptx, BeautifulSoup4, Pillow |
+| **Vector Store** | ChromaDB (persistent, `langchain-chroma`) |
+| **Keyword Search** | BM25 (`rank-bm25` via `BM25Retriever`) |
+| **History Store** | SQLite (`lumen_history.db`) |
+| **Document & Table Parsing** | PyMuPDF (`fitz` layout & table engine), python-docx, python-pptx, BeautifulSoup4, Pillow |
 | **Frontend** | Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS |
 | **Deployment** | Docker / Docker Compose |
 
 ---
 
-## Architecture
+## 🏛️ Architecture
 
 ```
-┌─────────────────┐        ┌────────────────────────────────────────────────┐
-│  Next.js UI      │        │                  FastAPI Backend                │
-│  localhost:3000  │        │                  localhost:8000                 │
-│                  │  /api  │                                                │
-│  Glass UI        │ ─────▶ │  ┌────────┐  ┌─────────┐  ┌──────────────┐     │
-│  light/dark      │ ◀───── │  │Loader  │→ │Chunker  │→ │  Embedder     │     │
-│  session sidebar │  JSON   │  │PDF/DOCX│  │Recursive│  │ all-MiniLM    │     │
-└─────────────────┘        │  │PPTX/...│  │Semantic │  │ L6 v2 (local) │     │
-                            │  └────────┘  └─────────┘  └──────┬────────┘     │
-                            │                                   │             │
-                            │                     ┌─────────────▼──────┐     │
-                            │                     │  ChromaDB           │     │
-                            │                     │  Vector store       │     │
-                            │                     └─────────────┬──────┘     │
-                            │                                   │             │
-                            │  ┌────────────────────────────────▼─────────┐  │
-                            │  │  Hybrid Retrieval                         │  │
-                            │  │  BM25 + Vector → RRF → Cross-Encoder      │  │
-                            │  └────────────────────────────────┬─────────┘  │
-                            │                                   │             │
-                            │  ┌────────────────────────────────▼─────────┐  │
-                            │  │  LLM  (Groq API via ChatGroq)             │  │
-                            │  │  answer + citations + refusal             │  │
-                            │  │  retry-with-backoff                       │  │
-                            │  └──────────────────────────────────────────┘  │
-                            │                                                │
-                            │  ┌──────────┐ ┌───────────────┐ ┌────────────┐ │
-                            │  │  Cache    │ │ Token/Cost    │ │ SQLite     │ │
-                            │  │  (TTL)    │ │ tracking      │ │ sessions   │ │
-                            │  └──────────┘ └───────────────┘ └────────────┘ │
-                            └────────────────────────────────────────────────┘
+┌─────────────────────────────────┐        ┌─────────────────────────────────────────────────────────────┐
+│          Next.js UI             │        │                       FastAPI Backend                       │
+│        localhost:3000           │        │                       localhost:8000                        │
+│                                 │  /api  │                                                             │
+│  • Edge-to-edge Unified Theme   │ ─────▶ │  ┌───────────────────────────────────────────────────────┐  │
+│  • Dark / Light Mode            │ ◀───── │  │ Ingestion Pipeline                                    │  │
+│  • Left-anchored Loading State  │  JSON  │  │  • PyMuPDF Layout & Table Extraction (to Markdown)    │  │
+│  • Custom In-App Confirm Modal  │        │  │  • Groq Vision AI (Transcribes Charts & Figures)      │  │
+│  • De-duplicated Source Cards   │        │  │  • Executive Document Map Generator                   │  │
+│  • Optimistic UI with Ref Guard │        │  │  • Contextual Retrieval Chunking (Breadcrumbs)        │  │
+└─────────────────────────────────┘        │  └──────────────────────────┬────────────────────────────┘  │
+                                           │                             │                               │
+                                           │               ┌─────────────▼──────────────┐                │
+                                           │               │     ChromaDB + BM25        │                │
+                                           │               │   Dense & Sparse Index     │                │
+                                           │               └─────────────┬──────────────┘                │
+                                           │                             │                               │
+                                           │  ┌──────────────────────────▼────────────────────────────┐  │
+                                           │  │ Hybrid Retrieval & Cross-Encoder Re-Ranking           │  │
+                                           │  │  • Query Rewriting (3 semantic variants)              │  │
+                                           │  │  • BM25 + Vector Search (RRF Fusion)                  │  │
+                                           │  │  • Cross-Encoder Re-Ranking (ms-marco-MiniLM)         │  │
+                                           │  └──────────────────────────┬────────────────────────────┘  │
+                                           │                             │                               │
+                                           │  ┌──────────────────────────▼────────────────────────────┐  │
+                                           │  │ Dual-Level Cognitive LLM Synthesis                    │  │
+                                           │  │  • Tier 1: Global Document Executive Overview         │  │
+                                           │  │  • Tier 2: Specific Tables, Text & Visual Figures     │  │
+                                           │  │  • Cleaned Citations + Refusal Guardrails             │  │
+                                           │  └───────────────────────────────────────────────────────┘  │
+                                           └─────────────────────────────────────────────────────────────┘
 ```
-
-**Pipeline:** load → chunk → embed → store → hybrid retrieve (BM25 + vector + RRF) → cross-encoder re-rank → prompt with context + history → Groq LLM → answer with inline citations (or a refusal).
 
 ---
 
-##  Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
 
 - **Python 3.11+**
 - **Node.js 18+**
-- A **Groq API key** (free) — create one at [console.groq.com](https://console.groq.com/keys)
+- A **Groq API key** — get one at [console.groq.com](https://console.groq.com/keys)
 
-### 1. Backend
+### 1. Backend Setup
 
 ```bash
 cd backend
 python -m venv .venv
+
 # Windows:
 .venv\Scripts\activate
 # macOS/Linux:
@@ -104,30 +103,14 @@ source .venv/bin/activate
 
 pip install -r requirements.txt
 cp .env.example .env
-# then open .env and set GROQ_API_KEY to your key
+# Set GROQ_API_KEY in .env
 
 uvicorn app.main:app --reload
 ```
 
-The API is live at `http://localhost:8000`. Verify: `curl http://localhost:8000/health`.
+The API will be live at `http://localhost:8000`. Verify with `curl http://localhost:8000/health`.
 
-> The first request downloads the local embedding and cross-encoder models, so it may take a little longer.
-
-### 2. Ingest your documents
-
-Drop files into `backend/documents/`, then either:
-
-- **Run the UI** (step 3) and use the **Upload** panel, or
-- **Via the API**:
-
-```bash
-curl -X POST http://localhost:8000/ingest/upload \
-  -F "files=@backend/documents/my-file.pdf"
-```
-
-### 3. Frontend
-
-Run these two commands (from the `frontend` directory):
+### 2. Frontend Setup
 
 ```bash
 cd frontend
@@ -135,29 +118,42 @@ npm install
 npm run dev
 ```
 
-- **`npm install`** — installs the frontend's dependencies (run once).
-- **`npm run dev`** — starts the Next.js dev server.
+Open **http://localhost:3000**. The UI proxy automatically forwards `/api` requests to `localhost:8000`.
 
-> Use `npm.cmd` instead of `npm` if you're on Windows and `npm` isn't resolving. Don't run a production build (`npm run build`) while the dev server is running — they share the `.next` cache and can corrupt it.
-
-Open **http://localhost:3000** — the UI proxy forwards `/api` → `localhost:8000` automatically (`next.config.js`).
-
-### 4. Docker (alternative)
+### 3. Docker (Alternative)
 
 ```bash
 docker compose up --build
 ```
 
-`docker-compose.yml` builds both services, waits for the backend health check, and mounts `backend/documents` plus a named `chroma_data` volume.
+---
+
+## 📊 Testing with Complex Multimodal Documents
+
+We provide a comprehensive, multi-page test PDF in the repository:  
+[`sample_documents/Project_Apex_Autonomous_Logistics.pdf`](sample_documents/Project_Apex_Autonomous_Logistics.pdf)
+
+This test document features:
+- **Architecture Flowcharts (Figure 1)**: Tests visual workflow and system component understanding.
+- **Quarterly Capex/Opex Stacked Bar Charts (Figure 2)**: Tests visual number extraction, axes, and budget peaking analysis.
+- **Dual-Axis Telemetry Line Plots (Figure 3)**: Tests empirical curve analysis (Payload weight vs Flight Range vs Power draw).
+- **Structured Financial & Risk Tables (Tables 1, 2, 3)**: Tests multi-column Markdown table extraction.
+
+### Sample Prompts to Try:
+- *"What is Project Apex, who are the key stakeholders, and what is the primary objective?"* (Holistic test)
+- *"According to the chart in Figure 2, what is the quarterly expenditure trend and in which quarter does it peak?"* (Vision test)
+- *"What does the telemetry graph in Figure 3 indicate about range and power consumption as payload increases from 1kg to 10kg?"* (Dual-axis vision test)
+- *"What is the allocated budget for Autonomous AI Navigation and who is the lead in Table 2?"* (Table test)
 
 ---
 
-##  Configuration (`backend/.env`)
+## ⚙️ Configuration (`backend/.env`)
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+|---|---|---|
 | `GROQ_API_KEY` | — | **Required.** Your Groq API key |
-| `LLM_MODEL` | `llama-3.3-70b-versatile` | Chat model served by the Groq API |
+| `LLM_MODEL` | `qwen/qwen3.8-27b` | Chat model served by the Groq API |
+| `VISION_MODEL` | `qwen/qwen3.8-27b` | Multimodal model for chart and image interpretation |
 | `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Local embedding model |
 | `RERANKER_MODEL` | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Local re-ranking cross-encoder |
 | `CHROMA_PERSIST_DIR` | `./chroma_db` | Chroma persistence directory |
@@ -166,77 +162,34 @@ docker compose up --build
 
 ---
 
-##  API Endpoints
+## 📡 API Endpoints
 
 | Method | Path | Description |
-|--------|------|-------------|
+|---|---|---|
 | `GET` | `/health` | Health check |
 | `POST` | `/ingest` | Ingest all documents from a server-side path |
-| `POST` | `/ingest/upload` | Upload and ingest one or more files |
-| `POST` | `/query` | RAG query (hybrid retrieval + re-rank + citations) |
-| `POST` | `/query/hybrid` | Explicit hybrid query |
-| `GET` | `/stats` | Cache stats and cumulative token usage |
-| `GET` | `/sessions` | List chat sessions |
-| `POST` | `/sessions` | Create a chat session |
-| `GET` | `/sessions/{id}` | Fetch a session and its messages |
-| `PATCH` | `/sessions/{id}` | Rename a session |
-| `DELETE` | `/sessions/{id}` | Delete a session |
-| `DELETE` | `/collection/{name}` | Delete a collection |
+| `POST` | `/ingest/upload` | Upload and ingest one or more files (with table & vision parsing) |
+| `POST` | `/query` | Dual-level RAG query (hybrid retrieval + vision + re-ranking) |
+| `POST` | `/query/hybrid` | Explicit hybrid retrieval query |
+| `GET` | `/stats` | Cache statistics and cumulative token usage |
+| `GET` | `/sessions` | List all chat sessions |
+| `POST` | `/sessions` | Create a new chat session |
+| `GET` | `/sessions/{id}` | Fetch conversation session history |
+| `PATCH` | `/sessions/{id}` | Rename a chat session |
+| `DELETE` | `/sessions/{id}` | Delete a chat session |
+| `DELETE` | `/collection/{name}`| Clear a document collection |
 
 ---
 
-## Project Structure
+## 🔒 Reliability & Defensive Engineering
 
-```
-.
-├── backend/
-│   ├── app/
-│   │   ├── main.py              # FastAPI application (routes)
-│   │   ├── loader.py            # Document loaders (PDF, DOCX, PPTX, HTML, MD, images)
-│   │   ├── chunker.py           # Recursive character splitting
-│   │   ├── semantic_chunker.py  # Sentence-aware semantic chunking (experimental)
-│   │   ├── vectorstore.py       # Chroma vector store
-│   │   ├── retriever.py         # Vector retrieval + duplicate-chunk dedup
-│   │   ├── hybrid_retriever.py  # BM25 + Vector + RRF + cross-encoder re-rank
-│   │   ├── rag.py               # RAG chain: query rewrite, citations, refusal, retry
-│   │   ├── cache.py             # Query cache with TTL
-│   │   ├── token_tracker.py     # Token usage / cost tracking
-│   │   ├── database.py          # SQLite chat sessions & messages
-│   │   ├── image_extractor.py   # PDF image extraction
-│   │   └── schemas.py           # Pydantic models
-│   ├── evaluation/              # Retrieval + faithfulness evaluation harness
-│   ├── documents/               # Your document collection (gitignored)
-│   ├── requirements.txt
-│   └── .env.example
-├── frontend/
-│   ├── src/
-│   │   ├── app/                 # page.tsx, layout.tsx, globals.css
-│   │   ├── components/          # Chat, MessageBubble, SourcePins, IngestPanel, Sidebar
-│   │   └── lib/api.ts           # API client (with request timeout)
-│   ├── package.json
-│   └── next.config.js           # /api → localhost:8000 proxy
-├── docker-compose.yml
-├── DESIGN.md                    # UI design system ("Glass Studio")
-├── PRODUCT.md
-└── README.md
-```
+- **Optimistic UI with Ref-based Hydration Guards**: Ephemeral ref tokens prevent asynchronous server hydration from wiping in-flight user messages.
+- **Defensive Confirmation Dialogs**: Custom, accessible modal with keyboard listeners (`Escape`), click-outside detection, and safe default focus prevents accidental chat deletion.
+- **Fingerprint-based Citation Deduplication**: Duplicate chunks across document pages are deduplicated using normalized content hashing so the user interface remains clean and informative.
+- **Retry with Exponential Backoff**: Transient LLM or network failures trigger automatic retries with progressive backoff.
 
 ---
 
-##  Reliability & Privacy
-
-- Retrieval **dedupes duplicate chunks** and the LLM call uses **retry-with-backoff** for stability.
-- The browser request has a **timeout + friendly retry** message, so transient slowness never hangs the UI.
-- **Embeddings and re-ranking run locally.** Retrieved context (not your whole corpus) is sent to the Groq API to generate the answer — so treat the hosted LLM as an external processor when your documents are sensitive.
-
----
-
-##  Evaluation
-
-`backend/evaluation/` contains a small harness (`run_eval.py`, `harness.py`, `chunk_experiment.py`, `questions_template.json`) for measuring **retrieval hit rate** and **answer faithfulness** against a labelled question set.
-
----
-
-##  License
+## 📄 License
 
 MIT
